@@ -2,6 +2,7 @@ var express = require('express');
 var hbs = require("hbs");
 require('./src/db/connection');
 var Register = require('./src/models/model');
+var bcrypt = require('bcryptjs');
 
 hbs.registerPartials("./partials");
 
@@ -27,47 +28,49 @@ app.get('/login', function(req, res) {
     res.render('login');
 });
 
-app.post('/register', function(req, res) {
-    const pwd = req.body.password;
-    const cpwd = req.body.confirmpassword;
+app.post('/register', async function(req, res) {
+    try {
+        const pwd = req.body.password;
+        const cpwd = req.body.confirmpassword;
 
-    if (pwd === cpwd) {
-        Register({
-            firstname: req.body.firstName,
-            lastname: req.body.lastName,
-            email: req.body.email,
-            gender: req.body.gender,
-            phone: req.body.phone,
-            age: req.body.age,
-            password: req.body.password,
-            confirmpassword: req.body.confirmpassword
-        }).save((err, data) => {
-            if (err) {
-                res.status(400).send('User cannot be registered!!!');
-            } else {
-                res.render('index');
-            }
-        });
-    } else {
-        res.status(400).send('Passwords do not match');
+        if (pwd === cpwd) {
+            const user = new Register({
+                firstname: req.body.firstName,
+                lastname: req.body.lastName,
+                email: req.body.email,
+                gender: req.body.gender,
+                phone: req.body.phone,
+                age: req.body.age,
+                password: req.body.password,
+                confirmpassword: req.body.confirmpassword
+            });
+
+            const registered = await user.save();
+            res.render('index');
+
+        } else {
+            res.status(400).send('Passwords do not match');
+        }
+    } catch (error) {
+        res.status(400).send('Cannot be registered!!')
     }
 });
 
-app.post('/login', (req, res) => {
-    const email = req.body.email;
-    const password = req.body.password;
+app.post('/login', async(req, res) => {
+    try {
+        const email = req.body.email;
+        const password = req.body.password;
 
-    Register.findOne({ email: email }, function(err, data) {
-        if (err) {
-            res.status(400).send("Invalid login details.");
+        const user = await Register.findOne({ email: email });
+        const match = await bcrypt.compare(password, user.password);
+        if (match) {
+            res.status(200).render('index');
         } else {
-            if (data.password === password) {
-                res.status(200).render('index');
-            } else {
-                res.status(404).send("Either Email or Password is incorrect.");
-            }
+            res.status(404).send("Either Email or Password is incorrect.");
         }
-    });
+    } catch (error) {
+        res.status(400).send("Invalid login details.");
+    }
 });
 
 app.listen(port, function() {
